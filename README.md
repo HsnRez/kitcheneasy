@@ -7,6 +7,8 @@ your choice is remembered.
 Everything (items, categories, photos) is stored **locally in your browser**
 (IndexedDB). No account, no server, no build step — just one HTML file.
 
+**🌐 Live: https://hsnrez.github.io/kitcheneasy/**
+
 ## Features
 
 - **Categories** (食品 / 調味料 / 飲み物 …) — add, rename and delete your own from the app
