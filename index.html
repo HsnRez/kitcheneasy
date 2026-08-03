@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2e7d52">
+<title>キッチン在庫</title>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --card: #ffffff;
+    --ink: #2b2b28;
+    --muted: #7a766c;
+    --line: #e5e1d8;
+    --accent: #2e7d52;
+    --accent-soft: #e4f1e9;
+    --danger: #b23b3b;
+    --danger-soft: #fbeeee;
+    /* state colours */
+    --s-empty: #b23b3b;
+    --s-buy:   #c9761d;
+    --s-half:  #c9a21d;
+    --s-open:  #2f6fb0;
+    --s-full:  #2e7d52;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo,
+                 "Microsoft JhengHei", "PingFang TC", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    padding: 0 0 90px;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 0 14px; }
+  button { font: inherit; cursor: pointer; }
+
+  /* ---- top bar ---- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--bg);
+    padding: 14px 14px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner { max-width: 620px; margin: 0 auto; display: flex; align-items: center; gap: 10px; }
+  .app-title { font-size: 1.25rem; font-weight: 700; margin: 0; flex: 1; display: flex; align-items: center; gap: 6px; }
+  .back-btn {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 999px; padding: 6px 12px; font-size: .85rem; font-weight: 600;
+  }
+  .langbar { display: flex; gap: 5px; }
+  .langbar button {
+    font-size: 0.72rem; font-weight: 700; padding: 5px 9px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; color: var(--muted); transition: all .15s;
+  }
+  .langbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ---- home: search + filter chips ---- */
+  .toolbar { padding-top: 12px; }
+  .search {
+    width: 100%; padding: 11px 14px; font-size: 1rem;
+    border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink); outline: none;
+  }
+  .search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 4px; -webkit-overflow-scrolling: touch; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; border: 1px solid var(--line); background: #fff; color: var(--muted);
+    border-radius: 999px; padding: 7px 14px; font-size: .85rem; font-weight: 600; white-space: nowrap;
+  }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip.manage { color: var(--accent); border-style: dashed; }
+
+  /* ---- item list ---- */
+  .list { padding-top: 10px; }
+  .item-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .item-row:active { transform: scale(.995); }
+  .thumb {
+    width: 56px; height: 56px; flex: 0 0 auto; border-radius: 10px; object-fit: cover;
+    background: var(--accent-soft); display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; color: var(--accent); overflow: hidden;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .item-main { flex: 1; min-width: 0; }
+  .item-name { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-sub { font-size: .82rem; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+  .qty-pill { font-weight: 700; color: var(--ink); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px; color: #fff; white-space: nowrap;
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.85); }
+  .empty-state { text-align: center; color: var(--muted); padding: 50px 20px; }
+  .empty-state .big { font-size: 2.4rem; margin-bottom: 8px; }
+  .section-label { font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 16px 2px 8px; }
+
+  /* ---- FAB ---- */
+  .fab {
+    position: fixed; right: max(18px, calc(50% - 310px + 6px)); bottom: 24px; z-index: 30;
+    width: 58px; height: 58px; border-radius: 50%; border: none;
+    background: var(--accent); color: #fff; font-size: 2rem; line-height: 1;
+    box-shadow: 0 6px 18px rgba(46,125,82,.4); display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ---- detail / forms ---- */
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 18px; margin-top: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-size: .8rem; font-weight: 700; margin-bottom: 6px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 11px 12px; font-size: 1rem; border: 1px solid var(--line);
+    border-radius: 10px; background: #fff; color: var(--ink); outline: none; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  textarea { resize: vertical; min-height: 90px; }
+
+  .photo-box {
+    position: relative; width: 100%; aspect-ratio: 4/3; border-radius: 14px; overflow: hidden;
+    background: var(--accent-soft); border: 2px dashed var(--line);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    color: var(--muted); text-align: center; cursor: pointer;
+  }
+  .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-box .ph-icon { font-size: 2.6rem; }
+  .photo-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
+  .photo-actions button {
+    border: none; background: rgba(0,0,0,.55); color: #fff; border-radius: 999px;
+    padding: 6px 12px; font-size: .8rem; font-weight: 600;
+  }
+
+  .qty-row { display: flex; align-items: stretch; gap: 8px; }
+  .qty-row .stepper { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .qty-row .stepper button { width: 46px; border: none; background: var(--accent-soft); color: var(--accent); font-size: 1.4rem; font-weight: 700; }
+  .qty-row .stepper input { width: 72px; border: none; border-radius: 0; text-align: center; box-shadow: none; }
+  .qty-row .unit { flex: 1; }
+
+  .states { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; }
+  .state-opt {
+    border: 1.5px solid var(--line); background: #fff; border-radius: 11px; padding: 10px 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: .78rem; font-weight: 700; color: var(--muted);
+    transition: all .12s;
+  }
+  .state-opt .sw { width: 16px; height: 16px; border-radius: 50%; }
+  .state-opt.active { color: #fff; border-color: transparent; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 18px; }
+  .btn {
+    flex: 1; padding: 13px; border-radius: 12px; border: none; font-size: 1rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+  .btn-danger { background: var(--danger-soft); color: var(--danger); }
+
+  /* ---- dept manager ---- */
+  .dept-row { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+  .dept-row .dept-name { flex: 1; font-weight: 600; }
+  .dept-row .dept-count { font-size: .8rem; color: var(--muted); }
+  .icon-btn { border: none; background: transparent; font-size: 1.1rem; padding: 6px 8px; border-radius: 8px; }
+  .icon-btn.del { color: var(--danger); }
+  .add-dept { display: flex; gap: 8px; margin-top: 6px; }
+  .add-dept input { flex: 1; }
+  .add-dept button { flex: 0 0 auto; padding: 0 18px; }
+
+  footer { text-align: center; color: var(--muted); font-size: .74rem; margin-top: 26px; padding-bottom: 10px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <button id="backBtn" class="back-btn hidden">‹ <span data-i18n="back"></span></button>
+    <h1 class="app-title"><span id="titleIcon">🧺</span><span id="titleText"></span></h1>
+    <div class="langbar" id="langbar">
+      <button type="button" data-lang="ja">日本語</button>
+      <button type="button" data-lang="zh">繁中</button>
+      <button type="button" data-lang="en">EN</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- ============ HOME ============ -->
+  <section id="view-home">
+    <div class="toolbar">
+      <input id="search" class="search" type="text" data-i18n-ph="search">
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="list" id="list"></div>
+    <footer data-i18n="tagline"></footer>
+  </section>
+
+  <!-- ============ ITEM DETAIL ============ -->
+  <section id="view-item" class="hidden">
+    <div class="card">
+      <div class="photo-box" id="photoBox">
+        <div class="ph-icon">📷</div>
+        <div data-i18n="add_photo"></div>
+        <div class="photo-actions hidden" id="photoActions">
+          <button type="button" id="changePhoto" data-i18n="change"></button>
+          <button type="button" id="removePhoto" data-i18n="remove"></button>
+        </div>
+      </div>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden">
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label data-i18n="l_name"></label>
+        <input type="text" id="f_name" data-i18n-ph="ph_name">
+      </div>
+      <div class="field">
+        <label data-i18n="l_dept"></label>
+        <select id="f_dept"></select>
+      </div>
+      <div class="field">
+        <label data-i18n="l_qty"></label>
+        <div class="qty-row">
+          <div class="stepper">
+            <button type="button" id="qtyMinus">−</button>
+            <input type="number" id="f_qty" step="any" min="0" value="1">
+            <button type="button" id="qtyPlus">＋</button>
+          </div>
+          <input type="text" id="f_unit" class="unit" data-i18n-ph="ph_unit">
+        </div>
+      </div>
+      <div class="field">
+        <label data-i18n="l_state"></label>
+        <div class="states" id="states"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label data-i18n="l_memo"></label>
+        <textarea id="f_memo" data-i18n-ph="ph_memo"></textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="saveItem">💾 <span data-i18n="save"></span></button>
+    </div>
+    <div class="btn-row" id="deleteRow">
+      <button class="btn btn-danger" id="deleteItem">🗑 <span data-i18n="delete"></span></button>
+    </div>
+  </section>
+
+  <!-- ============ DEPARTMENTS ============ -->
+  <section id="view-depts" class="hidden">
+    <div class="card">
+      <div class="section-label" data-i18n="depts_title"></div>
+      <div id="deptList"></div>
+      <div class="add-dept">
+        <input type="text" id="newDept" data-i18n-ph="ph_new_dept">
+        <button class="btn btn-primary" id="addDept" data-i18n="add"></button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<button class="fab" id="fab" title="add">＋</button>
+
+<script>
+/* ================= i18n ================= */
+const I18N = {
+  ja: {
+    docTitle: "キッチン在庫", appTitle: "キッチン在庫",
+    back: "戻る", search: "検索…", tagline: "キッチンの在庫をかんたん管理",
+    all: "すべて", manage: "⚙ カテゴリ編集",
+    add_photo: "写真を追加", change: "変更", remove: "削除",
+    l_name: "名前", ph_name: "例：牛乳", l_dept: "カテゴリ", l_qty: "数量",
+    ph_unit: "単位（本・個…）", l_state: "状態", l_memo: "メモ", ph_memo: "メモを入力…",
+    save: "保存", delete: "削除", add: "追加", uncat: "未分類",
+    depts_title: "カテゴリの管理", ph_new_dept: "新しいカテゴリ名",
+    empty_list: "アイテムがありません", empty_hint: "右下の＋から追加してください",
+    no_match: "見つかりません",
+    confirm_del_item: "このアイテムを削除しますか？",
+    confirm_del_dept: (n) => `カテゴリ「${n}」を削除しますか？中のアイテムは未分類になります。`,
+    need_name: "名前を入力してください",
+    st_empty: "空", st_buy: "要購入", st_half: "半分", st_open: "開封済", st_full: "新品",
+    seed: ["食品", "調味料", "飲み物", "冷凍", "日用品"]
+  },
+  zh: {
+    docTitle: "廚房庫存", appTitle: "廚房庫存",
+    back: "返回", search: "搜尋…", tagline: "輕鬆管理廚房庫存",
+    all: "全部", manage: "⚙ 編輯分類",
+    add_photo: "新增照片", change: "更換", remove: "移除",
+    l_name: "名稱", ph_name: "例：牛奶", l_dept: "分類", l_qty: "數量",
+    ph_unit: "單位（瓶・個…）", l_state: "狀態", l_memo: "備註", ph_memo: "輸入備註…",
+    save: "儲存", delete: "刪除", add: "新增", uncat: "未分類",
+    depts_title: "管理分類", ph_new_dept: "新分類名稱",
+    empty_list: "沒有項目", empty_hint: "點右下角的＋新增",
+    no_match: "找不到",
+    confirm_del_item: "確定要刪除這個項目嗎？",
+    confirm_del_dept: (n) => `確定要刪除分類「${n}」嗎？其中的項目會變成未分類。`,
+    need_name: "請輸入名稱",
+    st_empty: "空了", st_buy: "要補貨", st_half: "一半", st_open: "已開封", st_full: "全新",
+    seed: ["食品", "調味料", "飲料", "冷凍", "日用品"]
+  },
+  en: {
+    docTitle: "Kitchen Stock", appTitle: "Kitchen Stock",
+    back: "Back", search: "Search…", tagline: "Simple kitchen stock-take",
+    all: "All", manage: "⚙ Edit categories",
+    add_photo: "Add photo", change: "Change", remove: "Remove",
+    l_name: "Name", ph_name: "e.g. Milk", l_dept: "Category", l_qty: "Quantity",
+    ph_unit: "unit (pcs, bottle…)", l_state: "State", l_memo: "Memo", ph_memo: "Write a note…",
+    save: "Save", delete: "Delete", add: "Add", uncat: "Uncategorized",
+    depts_title: "Manage categories", ph_new_dept: "New category name",
+    empty_list: "No items yet", empty_hint: "Tap ＋ at bottom-right to add one",
+    no_match: "No matches",
+    confirm_del_item: "Delete this item?",
+    confirm_del_dept: (n) => `Delete category "${n}"? Its items become uncategorized.`,
+    need_name: "Please enter a name",
+    st_empty: "Empty", st_buy: "To buy", st_half: "Half", st_open: "Opened", st_full: "Full/new",
+    seed: ["Food", "Seasoning", "Drinks", "Frozen", "Household"]
+  }
+};
+
+/* state order = urgency (lowest index = most urgent, shown first) */
+const STATES = [
+  { key: "empty", color: "var(--s-empty)", emoji: "🈳" },
+  { key: "buy",   color: "var(--s-buy)",   emoji: "🛒" },
+  { key: "half",  color: "var(--s-half)",  emoji: "◑" },
+  { key: "open",  color: "var(--s-open)",  emoji: "📂" },
+  { key: "full",  color: "var(--s-full)",  emoji: "✅" }
+];
+const stateMeta = k => STATES.find(s => s.key === k) || STATES[3];
+const stateRank = k => { const i = STATES.findIndex(s => s.key === k); return i < 0 ? 3 : i; };
+
+/* ================= IndexedDB ================= */
+const DB = (() => {
+  let db;
+  function open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("kitchenStock", 1);
+      r.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains("items")) d.createObjectStore("items", { keyPath: "id" });
+        if (!d.objectStoreNames.contains("depts")) d.createObjectStore("depts", { keyPath: "id" });
+      };
+      r.onsuccess = e => { db = e.target.result; res(db); };
+      r.onerror = e => rej(e.target.error);
+    });
+  }
+  function tx(store, mode) { return db.transaction(store, mode).objectStore(store); }
+  function all(store) {
+    return new Promise((res, rej) => { const r = tx(store, "readonly").getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  }
+  function put(store, val) {
+    return new Promise((res, rej) => { const r = tx(store, "readwrite").put(val); r.onsuccess = () => res(val); r.onerror = () => rej(r.error); });
+  }
+  function del(store, id) {
+    return new Promise((res, rej) => { const r = tx(store, "readwrite").delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
+  }
+  return { open, all, put, del };
+})();
+
+/* ================= state ================= */
+let lang = localStorage.getItem("ksLang") || "ja";
+if (!I18N[lang]) lang = "ja";
+let items = [];
+let depts = [];
+let filterDept = "all";      // "all" | dept id | "uncat"
+let search = "";
+let editing = null;          // item being edited (or new draft)
+let draftPhoto = undefined;  // undefined = unchanged, null = removed, string = new
+
+const $ = s => document.querySelector(s);
+const t = () => I18N[lang];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => (s || "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+/* ================= i18n apply ================= */
+function applyLang() {
+  const T = t();
+  document.documentElement.lang = lang;
+  document.title = T.docTitle;
+  $("#titleText").textContent = T.appTitle;
+  document.querySelectorAll("[data-i18n]").forEach(n => {
+    const v = T[n.dataset.i18n]; if (typeof v === "string") n.textContent = v;
+  });
+  document.querySelectorAll("[data-i18n-ph]").forEach(n => {
+    const v = T[n.dataset.i18nPh]; if (typeof v === "string") n.placeholder = v;
+  });
+  document.querySelectorAll("#langbar button").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+  render();
+}
+
+/* ================= helpers ================= */
+const deptName = id => { const d = depts.find(x => x.id === id); return d ? d.name : t().uncat; };
+
+/* ================= HOME render ================= */
+function renderChips() {
+  const T = t();
+  const box = $("#chips");
+  let html = `<button class="chip ${filterDept==='all'?'active':''}" data-f="all">${esc(T.all)}</button>`;
+  depts.slice().sort((a,b)=>a.order-b.order).forEach(d => {
+    html += `<button class="chip ${filterDept===d.id?'active':''}" data-f="${d.id}">${esc(d.name)}</button>`;
+  });
+  if (items.some(i => !depts.find(d => d.id === i.deptId)))
+    html += `<button class="chip ${filterDept==='uncat'?'active':''}" data-f="uncat">${esc(T.uncat)}</button>`;
+  html += `<button class="chip manage" data-f="__manage">${esc(T.manage)}</button>`;
+  box.innerHTML = html;
+  box.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+    if (c.dataset.f === "__manage") { location.hash = "#/depts"; return; }
+    filterDept = c.dataset.f; renderChips(); renderList();
+  });
+}
+
+function visibleItems() {
+  const q = search.trim().toLowerCase();
+  return items.filter(i => {
+    if (filterDept === "uncat") { if (depts.find(d => d.id === i.deptId)) return false; }
+    else if (filterDept !== "all") { if (i.deptId !== filterDept) return false; }
+    if (q && !(i.name || "").toLowerCase().includes(q) && !(i.memo || "").toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => {
+    const ra = stateRank(a.state), rb = stateRank(b.state);
+    if (ra !== rb) return ra - rb;                       // most urgent state first
+    const qa = a.qty ?? 0, qb = b.qty ?? 0;
+    if (qa !== qb) return qa - qb;                       // then lowest quantity first
+    return (a.name || "").localeCompare(b.name || "");
+  });
+}
+
+function renderList() {
+  const T = t();
+  const box = $("#list");
+  const vis = visibleItems();
+  if (!items.length) {
+    box.innerHTML = `<div class="empty-state"><div class="big">🧺</div><div>${esc(T.empty_list)}</div><div style="font-size:.85rem;margin-top:6px">${esc(T.empty_hint)}</div></div>`;
+    return;
+  }
+  if (!vis.length) { box.innerHTML = `<div class="empty-state"><div class="big">🔍</div><div>${esc(T.no_match)}</div></div>`; return; }
+  box.innerHTML = vis.map(i => {
+    const sm = stateMeta(i.state);
+    const thumb = i.photo ? `<span class="thumb"><img src="${i.photo}" alt=""></span>` : `<span class="thumb">🥫</span>`;
+    const qtyTxt = (i.qty ?? 0) + (i.unit ? " " + esc(i.unit) : "");
+    return `<button class="item-row" data-id="${i.id}">
+      ${thumb}
+      <span class="item-main">
+        <span class="item-name">${esc(i.name)}</span>
+        <span class="item-sub">
+          <span class="qty-pill">${qtyTxt}</span>
+          <span>· ${esc(deptName(i.deptId))}</span>
+        </span>
+      </span>
+      <span class="badge" style="background:${sm.color}"><span class="dot"></span>${esc(T["st_"+i.state] || "")}</span>
+    </button>`;
+  }).join("");
+  box.querySelectorAll(".item-row").forEach(r => r.onclick = () => location.hash = "#/item/" + r.dataset.id);
+}
+
+function render() {
+  const view = currentView();
+  if (view === "home") { renderChips(); renderList(); }
+  else if (view === "depts") renderDepts();
+  else if (view === "item") renderItemForm();
+}
+
+/* ================= ITEM form ================= */
+function renderStates() {
+  const T = t();
+  $("#states").innerHTML = STATES.map(s => {
+    const active = editing && editing.state === s.key;
+    return `<button type="button" class="state-opt ${active?'active':''}" data-s="${s.key}"
+      style="${active?`background:${s.color}`:''}">
+      <span class="sw" style="background:${s.color}"></span>${esc(T["st_"+s.key])}</button>`;
+  }).join("");
+  $("#states").querySelectorAll(".state-opt").forEach(b => b.onclick = () => { editing.state = b.dataset.s; renderStates(); });
+}
+
+function renderPhoto() {
+  const cur = draftPhoto === undefined ? (editing && editing.photo) : draftPhoto;
+  const box = $("#photoBox");
+  box.querySelector("img")?.remove();
+  if (cur) {
+    const img = document.createElement("img"); img.src = cur; box.prepend(img);
+    box.querySelector(".ph-icon").classList.add("hidden");
+    box.querySelectorAll("div:not(.photo-actions):not(.ph-icon)").forEach(d => d.classList.add("hidden"));
+    $("#photoActions").classList.remove("hidden");
+  } else {
+    box.querySelector(".ph-icon").classList.remove("hidden");
+    box.querySelectorAll("div:not(.photo-actions)").forEach(d => d.classList.remove("hidden"));
+    $("#photoActions").classList.add("hidden");
+  }
+}
+
+function renderItemForm() {
+  const T = t();
+  // dept options
+  $("#f_dept").innerHTML =
+    depts.slice().sort((a,b)=>a.order-b.order).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("")
+    + `<option value="">${esc(T.uncat)}</option>`;
+  $("#f_name").value = editing.name || "";
+  $("#f_dept").value = editing.deptId || "";
+  $("#f_qty").value = editing.qty ?? 1;
+  $("#f_unit").value = editing.unit || "";
+  $("#f_memo").value = editing.memo || "";
+  renderStates();
+  renderPhoto();
+  $("#deleteRow").classList.toggle("hidden", editing.__isNew);
+}
+
+/* image resize -> dataURL */
+function fileToPhoto(file) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 1200;
+      let { width: w, height: h } = img;
+      if (w > max || h > max) { const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      res(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/* ================= DEPTS ================= */
+function renderDepts() {
+  const T = t();
+  const box = $("#deptList");
+  const sorted = depts.slice().sort((a,b)=>a.order-b.order);
+  box.innerHTML = sorted.map(d => {
+    const n = items.filter(i => i.deptId === d.id).length;
+    return `<div class="dept-row" data-id="${d.id}">
+      <span class="dept-name">${esc(d.name)}</span>
+      <span class="dept-count">${n}</span>
+      <button class="icon-btn edit" title="edit">✏️</button>
+      <button class="icon-btn del" title="delete">🗑</button>
+    </div>`;
+  }).join("") || `<div class="empty-state" style="padding:20px">—</div>`;
+  box.querySelectorAll(".dept-row").forEach(row => {
+    const id = row.dataset.id;
+    row.querySelector(".edit").onclick = async () => {
+      const d = depts.find(x => x.id === id);
+      const name = prompt(T.l_dept, d.name);
+      if (name && name.trim()) { d.name = name.trim(); await DB.put("depts", d); render(); }
+    };
+    row.querySelector(".del").onclick = async () => {
+      const d = depts.find(x => x.id === id);
+      if (!confirm(T.confirm_del_dept(d.name))) return;
+      // orphan its items
+      for (const it of items.filter(i => i.deptId === id)) { it.deptId = null; await DB.put("items", it); }
+      await DB.del("depts", id);
+      depts = depts.filter(x => x.id !== id);
+      render();
+    };
+  });
+}
+
+async function addDept(name) {
+  name = (name || "").trim(); if (!name) return;
+  const d = { id: uid(), name, order: (depts.reduce((m,x)=>Math.max(m,x.order),0) || 0) + 1 };
+  depts.push(d); await DB.put("depts", d);
+  $("#newDept").value = ""; render();
+}
+
+/* ================= ROUTER ================= */
+function currentView() {
+  const h = location.hash;
+  if (h.startsWith("#/item/")) return "item";
+  if (h === "#/depts") return "depts";
+  return "home";
+}
+function show(view) {
+  $("#view-home").classList.toggle("hidden", view !== "home");
+  $("#view-item").classList.toggle("hidden", view !== "item");
+  $("#view-depts").classList.toggle("hidden", view !== "depts");
+  $("#backBtn").classList.toggle("hidden", view === "home");
+  $("#fab").classList.toggle("hidden", view !== "home");
+  document.querySelector(".toolbar")?.classList.toggle("hidden", view !== "home");
+}
+
+function route() {
+  const h = location.hash;
+  if (h.startsWith("#/item/")) {
+    const id = h.slice("#/item/".length);
+    draftPhoto = undefined;
+    if (id === "new") {
+      const defDept = depts.slice().sort((a,b)=>a.order-b.order)[0];
+      editing = { id: uid(), name: "", deptId: defDept ? defDept.id : "", qty: 1, unit: "", state: "full", memo: "", photo: null, __isNew: true };
+    } else {
+      const found = items.find(i => i.id === id);
+      if (!found) { location.hash = "#/"; return; }
+      editing = Object.assign({}, found);
+    }
+    show("item"); renderItemForm();
+  } else if (h === "#/depts") {
+    show("depts"); renderDepts();
+  } else {
+    show("home"); renderChips(); renderList();
+  }
+  window.scrollTo(0, 0);
+}
+
+/* ================= wire up ================= */
+$("#backBtn").onclick = () => { if (currentView() !== "home") location.hash = "#/"; };
+$("#fab").onclick = () => location.hash = "#/item/new";
+$("#search").oninput = e => { search = e.target.value; renderList(); };
+
+$("#qtyMinus").onclick = () => { const el = $("#f_qty"); el.value = Math.max(0, (parseFloat(el.value)||0) - 1); };
+$("#qtyPlus").onclick  = () => { const el = $("#f_qty"); el.value = (parseFloat(el.value)||0) + 1; };
+
+$("#photoBox").onclick = e => { if (e.target.closest(".photo-actions")) return; $("#photoInput").click(); };
+$("#changePhoto").onclick = () => $("#photoInput").click();
+$("#removePhoto").onclick = () => { draftPhoto = null; renderPhoto(); };
+$("#photoInput").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  draftPhoto = await fileToPhoto(f); renderPhoto(); e.target.value = "";
+};
+
+$("#saveItem").onclick = async () => {
+  const name = $("#f_name").value.trim();
+  if (!name) { alert(t().need_name); $("#f_name").focus(); return; }
+  const rec = {
+    id: editing.id,
+    name,
+    deptId: $("#f_dept").value || null,
+    qty: parseFloat($("#f_qty").value) || 0,
+    unit: $("#f_unit").value.trim(),
+    state: editing.state || "full",
+    memo: $("#f_memo").value,
+    photo: draftPhoto === undefined ? (editing.photo || null) : draftPhoto,
+    updatedAt: Date.now()
+  };
+  await DB.put("items", rec);
+  const idx = items.findIndex(i => i.id === rec.id);
+  if (idx >= 0) items[idx] = rec; else items.push(rec);
+  location.hash = "#/";
+};
+
+$("#deleteItem").onclick = async () => {
+  if (!confirm(t().confirm_del_item)) return;
+  await DB.del("items", editing.id);
+  items = items.filter(i => i.id !== editing.id);
+  location.hash = "#/";
+};
+
+$("#addDept").onclick = () => addDept($("#newDept").value);
+$("#newDept").addEventListener("keydown", e => { if (e.key === "Enter") addDept($("#newDept").value); });
+
+document.querySelectorAll("#langbar button").forEach(b => b.onclick = () => {
+  lang = b.dataset.lang; localStorage.setItem("ksLang", lang); applyLang();
+});
+
+window.addEventListener("hashchange", route);
+
+/* ================= boot ================= */
+(async function init() {
+  await DB.open();
+  depts = await DB.all("depts");
+  items = await DB.all("items");
+  if (!depts.length) {
+    // seed default categories in the current language on first launch
+    t().seed.forEach((name, i) => depts.push({ id: uid(), name, order: i }));
+    for (const d of depts) await DB.put("depts", d);
+  }
+  applyLang();
+  route();
+})();
+</script>
+</body>
+</html>
